@@ -2,6 +2,7 @@ package com.example.android.customermaps;
 
 import android.Manifest;
 import android.app.Dialog;
+import android.app.FragmentTransaction;
 import android.app.SearchManager;
 import android.content.Context;
 import android.content.Intent;
@@ -31,14 +32,21 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+import com.google.android.gms.common.GooglePlayServicesRepairableException;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.places.Place;
+import com.google.android.gms.location.places.ui.PlacePicker;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.GoogleMapOptions;
+import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.loopj.android.http.HttpGet;
@@ -63,23 +71,26 @@ import cz.msebera.android.httpclient.client.methods.HttpUriRequest;
 import cz.msebera.android.httpclient.client.utils.URIBuilder;
 import cz.msebera.android.httpclient.impl.client.DefaultHttpClient;
 import cz.msebera.android.httpclient.util.EntityUtils;
+
 // FullSearcher https://www.drzon.net/how-to-create-a-clearable-autocomplete-dropdown-with-autocompletetextview/
 // Searcher with LISTVIEW http://www.androidhive.info/2012/09/android-adding-search-functionality-to-listview/
 // FUll Project https://github.com/stephenbaidu/android-place-picker/blob/master/placepicker/src/main/java/com/github/stephenbaidu/placepicker/PlacePicker.java
 // SearchView http://stackoverflow.com/questions/11491515/turn-autocompletetextview-into-a-searchview-in-actionbar-instead
 // search http://codetheory.in/adding-search-to-android/
 //  http://stackoverflow.com/questions/36449891/how-to-make-a-custom-place-picker-for-andorid/36451463
-public class InsertMapsActivity1 extends FragmentActivity {
+
+public class InsertMapsActivity1 extends FragmentActivity{
 
     private GoogleMap googleMap;
     private LatLng garageLocation;
     Button btnSetGarageLocation;
     SearchView search;
-    TextView searchbtn;
-    double lat = 20.423156;
-    double lng = -27.084917;
+    double lat = 20.423156, distance = 0, lng = -27.084917;
     Geocoder geocoder;
     List<Address> addresses;
+    Global global;
+    ArrayList<LatLng> MarkerPoints;
+    private static final int PLACE_PICKER_REQUEST = 101;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,52 +99,77 @@ public class InsertMapsActivity1 extends FragmentActivity {
         btnSetGarageLocation = (Button) findViewById(R.id.btn_set_garage_location);
         int status = GooglePlayServicesUtil.isGooglePlayServicesAvailable(getBaseContext());
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        searchbtn = (TextView) findViewById(R.id.send);
-        LayoutInflater inflater = (LayoutInflater)this.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-        // inflate the view that we created before
-        View v = inflater.inflate(R.layout.searchlist, null);
-
+        global = new Global();
+        // Getting GoogleMap object from the fragment
+        MarkerPoints = new ArrayList<LatLng>();
         if (status != ConnectionResult.SUCCESS) { // Google Play Services are not available
             int requestCode = 10;
             Dialog dialog = GooglePlayServicesUtil.getErrorDialog(status, this, requestCode);
             dialog.show();
         } else { // Google Play Services are available
-            InitializeMapping();
+            SupportMapFragment fm = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
+            googleMap = fm.getMap();
+            LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+            InitializeMapping(googleMap);
             // Getting reference to the SupportMapFragment of activity_main.xml
         }
         search = (SearchView) findViewById(R.id.search);
         search.setQueryHint("SearchView");
-
         //*** setOnQueryTextFocusChangeListener ***
         search.setOnQueryTextFocusChangeListener(new View.OnFocusChangeListener() {
 
             @Override
             public void onFocusChange(View v, boolean hasFocus) {
                 // TODO Auto-generated method stub
+                PlacePicker.IntentBuilder builder = new PlacePicker.IntentBuilder();
+                try {
+                    startActivityForResult(builder.build(InsertMapsActivity1.this), PLACE_PICKER_REQUEST);
+                } catch (GooglePlayServicesRepairableException e) {
+                    e.printStackTrace();
+                } catch (GooglePlayServicesNotAvailableException e) {
+                    e.printStackTrace();
+                }
 
-//                Toast.makeText(getBaseContext(), String.valueOf(hasFocus),                        Toast.LENGTH_SHORT).show();
-            }
+                /*              Intent intent = new Intent(InsertMapsActivity1.this, searchingActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                startActivity(intent);
+*/            }
         });
+search.setOnClickListener(new View.OnClickListener() {
+    @Override
+    public void onClick(View v) {
+        PlacePicker.IntentBuilder builder = new PlacePicker.IntentBuilder();
+        try {
+            startActivityForResult(builder.build(InsertMapsActivity1.this), PLACE_PICKER_REQUEST);
+        } catch (GooglePlayServicesRepairableException e) {
+            e.printStackTrace();
+        } catch (GooglePlayServicesNotAvailableException e) {
+            e.printStackTrace();
+        }
+
+    }
+});
 
         //*** setOnQueryTextListener ***
         search.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String query) {
 //                Toast.makeText(getBaseContext(), "\n" + query,                        Toast.LENGTH_SHORT).show();
-                return false;
+
+           return false;
             }
+
             @Override
             public boolean onQueryTextChange(String newText) {
                 if (newText != null) {
-
                     Geocoder coder = new Geocoder(InsertMapsActivity1.this);
                     List<Address> address;
                     double x = 0, y = 0;
                     try {
                         address = coder.getFromLocationName(newText.toString(), 5);
-                        if (address == null) {
+                        if (address.toString().length() < 3) {
                             return Boolean.parseBoolean(null);
-                        }else {
+                        } else {
                             Address location = address.get(0);
                             x = location.getLatitude();
                             y = location.getLongitude();
@@ -141,44 +177,39 @@ public class InsertMapsActivity1 extends FragmentActivity {
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
+
                     LatLng Position_mark = new LatLng(x, y);
                     Position_mark = new LatLng(x, y);
-/*
-                googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(Position_mark, 15));
-                googleMap.animateCamera(CameraUpdateFactory.zoomTo(13), 2000, null);
-*/
 
                     googleMap.clear();
                     googleMap.addMarker(new MarkerOptions().position(Position_mark).title("Custom location").icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
                     garageLocation = Position_mark;
                     googleMap.moveCamera(CameraUpdateFactory.newLatLng(Position_mark));
-
                     // Zoom in the Google Map
                     googleMap.animateCamera(CameraUpdateFactory.zoomTo(15));
-
                     googleMap.getMaxZoomLevel();
 
  /*               googleMap.setOnMapClickListener(this);
                 googleMap.setOnMapLongClickListener(this);
                 googleMap.setOnMarkerDragListener(this);
 */
+
                 }
                 return false;
-
             }
         });
 
     }
 
-
-    protected void InitializeMapping() {
-        SupportMapFragment fm = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
-
-        // Getting GoogleMap object from the fragment
-        googleMap = fm.getMap();
-
-        // Enabling MyLocation Layer of Google Map
+    protected void InitializeMapping(final GoogleMap gogleMap) {
+        googleMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
         googleMap.setMyLocationEnabled(true);
+        googleMap.setTrafficEnabled(true);
+        googleMap.setIndoorEnabled(false);
+        googleMap.setBuildingsEnabled(true);
+        googleMap.getUiSettings().setZoomControlsEnabled(true);
+        // Enabling MyLocation Layer of Google Map
+        gogleMap.setMyLocationEnabled(true);
 
         // Getting LocationManager object from System Service LOCATION_SERVICE
         LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
@@ -215,7 +246,7 @@ public class InsertMapsActivity1 extends FragmentActivity {
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, new android.location.LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
-                CameraToLocation(location);
+//                CameraToLocation(location);
                 // Setting latitude and longitude in the TextView tv_location
 
                 lat = location.getLatitude();
@@ -240,7 +271,6 @@ public class InsertMapsActivity1 extends FragmentActivity {
                 }
                 //      tv1.setText(addresses.toString());
                 Toast.makeText(getApplicationContext(), "\n" + "\n" + area + "\n" + CityName + "\n" + country, Toast.LENGTH_LONG).show();
-
             }
 
             @Override
@@ -258,11 +288,12 @@ public class InsertMapsActivity1 extends FragmentActivity {
 
             }
         });
-        googleMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
+
+        gogleMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
             @Override
             public void onMapClick(LatLng latLng) {
-                googleMap.clear();
-                googleMap.addMarker(new MarkerOptions().position(latLng).title("Custom location").icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
+                //googleMap.clear();
+//                googleMap.addMarker(new MarkerOptions().position(latLng).title("Custom location").icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
                 garageLocation = latLng;
                 googleMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
 
@@ -270,17 +301,56 @@ public class InsertMapsActivity1 extends FragmentActivity {
                 googleMap.animateCamera(CameraUpdateFactory.zoomTo(15));
 
                 googleMap.getMaxZoomLevel();
-                LatLng origin = new LatLng(lat,lng);
-                LatLng dest = new LatLng(latLng.latitude,latLng.longitude);
+                LatLng origin = new LatLng(lat, lng);
+                LatLng dest = new LatLng(latLng.latitude, latLng.longitude);
 
-                String url = getDirectionsUrl(origin, dest);
 
-                DownloadTask downloadTask = new DownloadTask();
+                if (MarkerPoints.size() > 1) {
+                    MarkerPoints.clear();
+                    googleMap.clear();
+                }
 
-                downloadTask.execute(url);
+                MarkerPoints.add(latLng);
+
+                // Creating MarkerOptions
+                MarkerOptions options = new MarkerOptions();
+
+                // Setting the position of the marker
+                options.position(latLng);
+
+                /**
+                 * For the start location, the color of marker is GREEN and
+                 * for the end location, the color of marker is RED.
+                 */
+                if (MarkerPoints.size() == 1) {
+                    options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+                    options.title("getting me");
+//                    http://stackoverflow.com/questions/35554796/rotate-marker-and-move-animation-on-map-like-uber-android
+                    MapFragment mMapFragment;
+//(in my case, MapFragment extends SupportMapFragment implements GoogleMap.OnInfoWindowClickListener)
+                    Marker marker = googleMap.addMarker(options);
+                    global.rotateMarker(marker, 250);
+                } else if (MarkerPoints.size() == 2) {
+                    options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED));
+                    options.title("Destination");
+                    origin = new LatLng(MarkerPoints.get(0).latitude, MarkerPoints.get(0).longitude);
+                    dest = new LatLng(MarkerPoints.get(1).latitude, MarkerPoints.get(1).longitude);
+                    googleMap.addMarker(options);
+                    String url = getDirectionsUrl(origin, dest);
+                    if (global.isNetworkAvailable(getApplicationContext())) {
+                        DownloadTask downloadTask = new DownloadTask();
+                        //           Toast.makeText(getApplicationContext(), String.valueOf(calculateDistance(lat, lng, latLng.latitude, latLng.longitude)), Toast.LENGTH_LONG).show();
+                        downloadTask.execute(url);
+                    } else {
+                        global.CustomToast(getApplicationContext(), "Network Problem", "Cannot get Routing \n Check Internet Connection");
+                    }
+                }
+
+                // Add new marker to the Google Map Android API V2
+//                googleMap.addMarker(options);
+                // Checks, whether start and end locations are captured
             }
         });
-
     }
 
 
@@ -323,33 +393,33 @@ VVIP //http://stackoverflow.com/questions/12460471/how-to-send-a-google-places-s
 
 ROUTING
 */
-    private String getDirectionsUrl(LatLng origin,LatLng dest){
+    private String getDirectionsUrl(LatLng origin, LatLng dest) {
 
         // Origin of route
-        String str_origin = "origin="+origin.latitude+","+origin.longitude;
+        String str_origin = "origin=" + origin.latitude + "," + origin.longitude;
 
         // Destination of route
-        String str_dest = "destination="+dest.latitude+","+dest.longitude;
+        String str_dest = "destination=" + dest.latitude + "," + dest.longitude;
 
         // Sensor enabled
         String sensor = "sensor=true";
 
         // Building the parameters to the web service
-        String parameters = str_origin+"&"+str_dest+"&"+sensor;
+        String parameters = str_origin + "&" + str_dest + "&" + sensor;
 
         // Output format
         String output = "json";
 
-        String url = "https://maps.googleapis.com/maps/api/directions/"+output+"?"+parameters;
+        String url = "https://maps.googleapis.com/maps/api/directions/" + output + "?" + parameters;
 
         return url;
     }
 
-    private String downloadUrl(String strUrl) throws IOException{
+    private String downloadUrl(String strUrl) throws IOException {
         String data = "";
         InputStream iStream = null;
         HttpURLConnection urlConnection = null;
-        try{
+        try {
             URL url = new URL(strUrl);
 
             urlConnection = (HttpURLConnection) url.openConnection();
@@ -362,10 +432,10 @@ ROUTING
 
             BufferedReader br = new BufferedReader(new InputStreamReader(iStream));
 
-            StringBuffer sb  = new StringBuffer();
+            StringBuffer sb = new StringBuffer();
 
             String line = "";
-            while( ( line = br.readLine())  != null){
+            while ((line = br.readLine()) != null) {
                 sb.append(line);
             }
 
@@ -373,14 +443,15 @@ ROUTING
 
             br.close();
 
-        }catch(Exception e){
+        } catch (Exception e) {
             //      Log.d("Exception while downloading url", e.toString());
-        }finally{
+        } finally {
             iStream.close();
             urlConnection.disconnect();
         }
         return data;
     }
+
     private class DownloadTask extends AsyncTask<String, Void, String> {
 
         // Downloading data in non-ui thread
@@ -390,11 +461,11 @@ ROUTING
             // For storing data from web service
             String data = "";
 
-            try{
+            try {
                 // Fetching the data from web service
                 data = downloadUrl(url[0]);
-            }catch(Exception e){
-                Log.d("Background Task",e.toString());
+            } catch (Exception e) {
+                Log.d("Background Task", e.toString());
             }
             return data;
         }
@@ -413,7 +484,7 @@ ROUTING
     }
 
 
-    private class ParserTask extends AsyncTask<String, Integer, List<List<HashMap<String,String>>>> {
+    private class ParserTask extends AsyncTask<String, Integer, List<List<HashMap<String, String>>>> {
 
         @Override
         protected List<List<HashMap<String, String>>> doInBackground(String... jsonData) {
@@ -421,13 +492,13 @@ ROUTING
             JSONObject jObject;
             List<List<HashMap<String, String>>> routes = null;
 
-            try{
+            try {
                 jObject = new JSONObject(jsonData[0]);
                 DirectionsJSONParser parser = new DirectionsJSONParser();
 
                 // Starts parsing data
                 routes = parser.parse(jObject);
-            }catch(Exception e){
+            } catch (Exception e) {
                 e.printStackTrace();
             }
             return routes;
@@ -439,20 +510,21 @@ ROUTING
             PolylineOptions lineOptions = null;
             lineOptions = new PolylineOptions();
             // Traversing through all the routes
-            for(int i=0;i<result.size();i++){
+            distance = 0;
+            for (int i = 0; i < result.size(); i++) {
                 // Fetching i-th route
                 List<HashMap<String, String>> path = result.get(i);
                 lineOptions = new PolylineOptions();
                 points = new ArrayList<LatLng>();
 
                 // Fetching all the points in i-th route
-                for(int j=0;j<path.size();j++){
-                    HashMap<String,String> point = path.get(j);
+                for (int j = 0; j < path.size(); j++) {
+                    HashMap<String, String> point = path.get(j);
 
                     double lat = Double.parseDouble(point.get("lat"));
                     double lng = Double.parseDouble(point.get("lng"));
                     LatLng position = new LatLng(lat, lng);
-
+                    distance += 0.01;
                     points.add(position);
                 }
 
@@ -466,11 +538,97 @@ ROUTING
 
             // Getting GoogleMap object from the fragment
             googleMap.addPolyline(lineOptions);
+            Toast.makeText(getApplicationContext(), String.valueOf(distance), Toast.LENGTH_LONG).show();
+        }
+    }
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == PLACE_PICKER_REQUEST) {
+            if (resultCode == RESULT_OK) {
+                double x = 0, y = 0;
+
+
+                Place place = PlacePicker.getPlace(data, this);
+                String toastMsg = String.format("Place: %s", place.getName());
+                Toast.makeText(this, toastMsg, Toast.LENGTH_LONG).show();
+
+                Geocoder coder = new Geocoder(InsertMapsActivity1.this);
+                List<Address> address;
+                try {
+                    address = coder.getFromLocationName(place.getName().toString(), 5);
+                    if (address.toString().length() < 3) {
+ //                       return (null);
+                    } else {
+                        Address location = address.get(0);
+                        x = location.getLatitude();
+                        y = location.getLongitude();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                LatLng Position_mark = new LatLng(x, y);
+                Position_mark = new LatLng(x, y);
+
+                googleMap.clear();
+                googleMap.addMarker(new MarkerOptions().position(Position_mark).title("Custom location").icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
+                garageLocation = Position_mark;
+                googleMap.moveCamera(CameraUpdateFactory.newLatLng(Position_mark));
+                // Zoom in the Google Map
+                googleMap.animateCamera(CameraUpdateFactory.zoomTo(15));
+                googleMap.getMaxZoomLevel();
+//https://developers.google.com/places/android-api/photos
+
+                LatLng origin = new LatLng(lat, lng);
+                LatLng dest = new LatLng(lat, lng);
+
+
+                if (MarkerPoints.size() > 1) {
+                    MarkerPoints.clear();
+                    googleMap.clear();
+                }
+
+                MarkerPoints.add(Position_mark);
+
+                // Creating MarkerOptions
+                MarkerOptions options = new MarkerOptions();
+
+                // Setting the position of the marker
+                options.position(Position_mark);
+
+                /**
+                 * For the start location, the color of marker is GREEN and
+                 * for the end location, the color of marker is RED.
+                 */
+                if (MarkerPoints.size() == 1) {
+                    options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN));
+                    options.title("getting me");
+//                    http://stackoverflow.com/questions/35554796/rotate-marker-and-move-animation-on-map-like-uber-android
+                    MapFragment mMapFragment;
+//(in my case, MapFragment extends SupportMapFragment implements GoogleMap.OnInfoWindowClickListener)
+                    Marker marker = googleMap.addMarker(options);
+                    global.rotateMarker(marker, 250);
+                } else if (MarkerPoints.size() == 2) {
+                    options.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED));
+                    options.title("Destination");
+                    origin = new LatLng(MarkerPoints.get(0).latitude, MarkerPoints.get(0).longitude);
+                    dest = new LatLng(MarkerPoints.get(1).latitude, MarkerPoints.get(1).longitude);
+                    googleMap.addMarker(options);
+                    String url = getDirectionsUrl(origin, dest);
+                    if (global.isNetworkAvailable(getApplicationContext())) {
+                        DownloadTask downloadTask = new DownloadTask();
+                        //           Toast.makeText(getApplicationContext(), String.valueOf(calculateDistance(lat, lng, latLng.latitude, latLng.longitude)), Toast.LENGTH_LONG).show();
+                        downloadTask.execute(url);
+                    } else {
+                        global.CustomToast(getApplicationContext(), "Network Problem", "Cannot get Routing \n Check Internet Connection");
+                    }
+                }
+
+
+            }
         }
     }
 
-
-}
+    }
 
 //http://stackoverflow.com/questions/12460471/how-to-send-a-google-places-search-request-with-java
 
@@ -479,7 +637,7 @@ class GooglePlacesClient1 {
 
     private final HttpClient client = new DefaultHttpClient();
 
-    public static void main(final String[] args) throws ParseException, IOException, URISyntaxException {
+    public void main(final String[] args) throws ParseException, IOException, URISyntaxException {
         new GooglePlacesClient1().performSearch("establishment", 8.6668310, 50.1093060);
     }
 
@@ -500,5 +658,6 @@ class GooglePlacesClient1 {
 
         System.out.println(response);
     }
+
 
 }

@@ -37,10 +37,10 @@ import java.net.URLEncoder;
 import java.util.Collections;
 import java.util.List;
 
+//streetView https://developers.google.com/maps/documentation/android-api/streetview
+
 //Implemented http://wptrafficanalyzer.in/blog/drawing-driving-route-directions-between-two-locations-using-google-directions-in-google-map-android-api-v2/
 // https://github.com/stephenbaidu/android-place-picker
-
-
 
 // Routing http://stackoverflow.com/questions/17425499/how-to-draw-interactive-polyline-on-route-google-maps-v2-android
 //https://www.youtube.com/watch?v=qpkcvUlc7ms
@@ -68,7 +68,7 @@ public class MainActivity extends AppCompatActivity {
 
 
         Intent intent = new Intent(MainActivity.this, InsertMapsActivity1.class);
-//        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(intent);
 
 

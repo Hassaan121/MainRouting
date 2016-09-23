@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.example.android.customermaps.InsertMapsActivity">
+    tools:context="com.example.android.customermaps.InsertMapsActivity1">
 
     <fragment xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:map="http://schemas.android.com/apk/res-auto"
@@ -27,7 +27,7 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="45dp"
+        android:layout_marginTop="10dp"
         android:background="#029fff">
 
         <SearchView
@@ -38,27 +38,6 @@
             android:text=""
             android:textAlignment="center" />
 
-        <TextView
-            android:id="@+id/send"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true"
-            android:layout_gravity="end"
-            android:hint="search"
-            android:text="Search"
-            android:textAlignment="center" />
-
-<ScrollView
-    android:layout_width="match_parent"
-    android:layout_height="100dp"
-    android:layout_marginTop="30dp">
-    <android.support.v7.widget.ListViewCompat
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
-    </android.support.v7.widget.ListViewCompat>
-
-</ScrollView>
 
     </FrameLayout>
 
